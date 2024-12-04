@@ -5,3 +5,7 @@ Memory usage: Average case: 12 bytes/timeline (assuming BitArray is used in plac
 Using GMP for Laravel:
 Predicted execution time: <1ms
 Memory usage: Average case: 12 bytes/timeline
+
+
+main.py => initial demo script
+mainv2.py => in progress, main script
