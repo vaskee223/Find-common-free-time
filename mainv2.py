@@ -5,7 +5,6 @@ import re
 MINUTES_PER_SEGMENT = 15
 SEGMENTS_PER_HOUR = 4
 TIME_PATTERN = r"\d{2}"
-#TIMES_PATTERN = r"(\d{2}\D*\d{2}\D*\d{2}\D*\d{2})"
 
 #Extract integers from previously extracted list using regex. Helper function
 def parse_times(match):
@@ -55,14 +54,13 @@ def normalize_timeline(timeline, start, end):
     end_index = min(len(timeline.schedule), end_index)
     return timeline.schedule[start_index:end_index]
 
-#Returns all free time blocks from a list of timeline objects
+#Returns all free time blocks from a list of timeline objects. Manual calls as print parameter only. Helper function
 def compare_timelines(timelines: list):
     if not timelines:
         print("List of timelines for comparison is empty!")
         return
     if len(timelines) == 1:
-        print(find_free_times(timelines[0].schedule, timelines[0].start))
-        return
+        return find_free_times(timelines[0].schedule, timelines[0].start)
     start = max(timeline.start for timeline in timelines)
     end = min(timeline.end for timeline in timelines)
     if start >= end:
@@ -72,6 +70,44 @@ def compare_timelines(timelines: list):
     for timeline in timelines[1:]:
         aligned &= normalize_timeline(timeline, start, end)
     return find_free_times(aligned, start)
+#Utilises compare_timelines to print a comparison of schedules within a list of users
+def compare_users(users:list):
+    if not users:
+        print("List of users for comparison is empty!")
+        return
+    if len(users)==1:
+        for x in users[0].days.items():
+            print(f"{x[0]}: {compare_timelines([x[1]])}")
+    else:
+        days = users[0].days.keys()
+        for day in days:
+            time_list = []
+            for user in users:
+                time_list.append(user.days[day])
+            print(f"{day}: {compare_timelines(time_list)}")
+#Prints out a comparison of schedules from a list of teams
+def compare_teams(teams: list):
+    if not teams:
+        print("List of teams for comparison is empty!")
+        return
+    if len(teams) == 1:
+        team = teams[0]
+        if not team.members:
+            print("The single team has no members!")
+            return
+        days = team.members[0].days.keys()
+        for day in days:
+            timelines = [member.days[day] for member in team.members if day in member.days]
+            print(f"{day}: {compare_timelines(timelines)}")
+    else:
+        days = teams[0].members[0].days.keys()
+        for day in days:
+            timelines = []
+            for team in teams:
+                for member in team.members:
+                    if day in member.days:
+                        timelines.append(member.days[day])
+            print(f"{day}: {compare_timelines(timelines)}")
 
 #Returns list of free time blocks from timeline methods. Helper function
 def find_free_times(schedule, schedule_start):
@@ -86,7 +122,6 @@ def find_free_times(schedule, schedule_start):
             end = i
         if((schedule[i]==0 or i==len(schedule)-1) and start is not None):
             find = index_to_time(start, schedule_start) + "-" + index_to_time(end + 1, schedule_start)
-            print(find)
             found.append(find)
             start = None
             end = None
@@ -156,7 +191,6 @@ class Timeline:
         self.schedule[start_index:end_index] = bitarray('0' * change_length)
         #print("Free time set")
         
-    ############# ------------------------- ##############
     #Mark a time period as available. String of 4x2-digit numbers as input in any format. Regex
     def set_free_time(self, user_input:str):
         match = re.findall(TIME_PATTERN, user_input)
@@ -177,53 +211,105 @@ class Timeline:
         print(f"Start time: {self.start}")
         print(f"End time: {self.end}")
         print(f"Schedule: {self.schedule}")
-"""
-    def set_free_time(self):
-        print("Enter start and end hours:")
-        user_input = input()
-        match = re.match(TIMES_PATTERN, user_input)
-        if match is None or not validate_times(match):
-            print("Invalid start and end times")
-            return
-        start_hour, start_minute, end_hour, end_minute = parse_times(match)
-        start_minute = round_minute(start_minute)
-        end_minute = round_minute(end_minute)
-        start_index = time_to_index(start_hour, start_minute, self.timeline["start"])
-        end_index = time_to_index(end_hour, end_minute, self.timeline["start"])
-        change_length = end_index - start_index
-        self.timeline["schedule"][start_index:end_index+1] = bitarray('1' * (change_length + 1))
-        print("Free time set")
 
-    def set_busy_time(self):
-        print("Enter start and end hours:")
-        user_input = input()
-        match = re.match(TIMES_PATTERN, user_input)
-        if match is None or not validate_times(match):
-            print("Invalid start and end times")
-            return
-        start_hour, start_minute, end_hour, end_minute = parse_times(match)
-        start_minute = round_minute(start_minute)
-        end_minute = round_minute(end_minute)
-        start_index = time_to_index(start_hour, start_minute, self.timeline["start"])
-        end_index = time_to_index(end_hour, end_minute, self.timeline["start"])
-        change_length = end_index - start_index
-        self.timeline["schedule"][start_index:end_index+1] = bitarray('0' * (change_length + 1))
-        print("Free time set")
-"""
+class User:
+    def __init__(self, name="User", surname="User"):
+        self.id = 0
+        self.name = name
+        self.surname = surname
+        self.days = {}
+
+    #Sets schedule for provided day to user
+    def set_day(self, day, start, end):
+        if day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+            self.days[day] = Timeline(start, end)
+
+    #Sets a default schedule to user for demo
+    def populate_days_default(self):
+        timeline = Timeline(8,20)
+        timeline.set_free_time("09 00 17 00")
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        for x in days:
+            self.days[x] = timeline
+
+    def display(self):
+        days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        for x in days:
+            print(f"{x}: {self.days[x].schedule}")
+            print(f"{self.name} {self.surname}")
+
+class Team:
+    def __init__(self, name="Team"):
+        self.name = name
+        self.members = []
+        
+    def display(self):
+        print(f"{self.name}")
+        print("Members: ")
+        for x in self.members:
+            print(f"{x.id}. {x.name}, {x.surname}")
+
+    #Adds user to this team
+    def add_member(self, member):
+        if isinstance(member, User):
+            member.id = len(self.members)
+            self.members.append(member)
+
+    #Removes user with id from this team
+    def remove_member(self, member_id):
+        try:
+            del self.members[member_id]
+        except IndexError:
+            print("Invalid member id!")
+        else:
+            print("Member removed")
+            
+#<------------------------------------------------------------------------->
+#Test classes:
 
 
+# Create Team A
+team1 = Team("Team A")
+for i in range(1, 6):
+    user = User(f"User{i}", f"Surname{i}")
+    for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+        user.set_day(day, 8, 20)#<----- day to create schedule for; starting hour for timeline; end hour for timeline
+        user.days[day].set_free_time("08 30 to 16 30")#<----- 4x2-digit in any format - interpreted as HH:MM-HH:MM
+        user.days[day].set_busy_time("10 00 - 10 30")
+        user.days[day].set_busy_time("15 00 - 15 30")
+    team1.add_member(user)
 
+# Create Team B
+team2 = Team("Team B")
+for i in range(6, 11):
+    user = User(f"User{i}", f"Surname{i}")
+    for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+        user.set_day(day, 8, 20)
+        user.days[day].set_free_time("08 30 to 16 30")
+        user.days[day].set_busy_time("10 00 - 10 30")
+        user.days[day].set_busy_time("15 00 - 15 30")
+    team2.add_member(user)
 
-t1 = Timeline(6, 16)
-t1.schedule = bitarray('1' * 40)
-t2 = Timeline(8, 18)
-t2.schedule = bitarray('1' * 40)
-t3 = Timeline(11,13)
-t3.schedule = bitarray('1' * 8)
-#t1.set_free_time("from 00 00 to 0300")
-#t1.set_busy_time("0900 0930")
-t1.display()
-#t1.set_busy_time("start at 0830 end at 0915")
-#t1.display()
-print(compare_timelines([t1,t2,t3]))
-#print(compare_timelines([t1]))
+# Create Team C
+team3 = Team("Team C")
+for i in range(11, 16):
+    user = User(f"User{i}", f"Surname{i}")
+    for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]:
+        user.set_day(day, 8, 20)
+        user.days[day].set_free_time("08 30 to 16 30")
+        user.days[day].set_busy_time("10 00 - 10 30")
+        user.days[day].set_busy_time("15 00 - 15 30")
+    team3.add_member(user)
+
+# Display teams
+team1.display()
+team2.display()
+team3.display()
+
+# Compare days, users, and teams
+print("Compare 2 days:")
+print(compare_timelines([team1.members[0].days["Monday"], team2.members[0].days["Monday"]]))
+print("Compare 2 users:")
+compare_users([team1.members[0], team2.members[0]])
+print("Compare 3 teams:")
+compare_teams([team1, team2, team3])
